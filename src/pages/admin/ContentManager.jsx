@@ -120,7 +120,7 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-k-bg" style={{ left: '240px' }}>
+    <div className="fixed inset-0 z-50 flex flex-col bg-k-bg md:left-60">
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 h-14 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
         <div className="flex items-center gap-3">
@@ -147,7 +147,7 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
       <div className="flex flex-1 overflow-hidden">
         {/* ── Left: editable form ── */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-k-muted text-sm mb-1.5">Título</label>
               <input value={form.title} onChange={e => set('title', e.target.value)} className={INP} style={INP_S} />
@@ -205,7 +205,7 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
           </div>
 
           {/* Drive / Frame links */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-k-muted text-sm mb-1.5">Drive URL</label>
               <input value={form.driveUrl} onChange={e => set('driveUrl', e.target.value)} placeholder="https://drive.google.com/..." className={INP} style={INP_S} />
@@ -320,7 +320,7 @@ export default function ContentManager() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -377,7 +377,7 @@ export default function ContentManager() {
             <p className="text-k-muted text-sm">No hay piezas activas con estos filtros.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(p => (
               <PieceCard key={p.id} piece={p} clients={clients} onView={setSelectedPiece} onDelete={handleDelete} />
             ))}
@@ -385,8 +385,8 @@ export default function ContentManager() {
         )
       ) : (
         /* Table view */
-        <div className="rounded-card-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-          <table className="w-full">
+        <div className="rounded-card-lg overflow-x-auto" style={{ border: '1px solid var(--color-border)' }}>
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="bg-k-surface" style={{ borderBottom: '1px solid var(--color-border)' }}>
                 {['Título', 'Cliente', 'Formato', 'Pilar', 'Fecha', 'Estado', 'Acciones'].map(h => (
@@ -429,8 +429,8 @@ export default function ContentManager() {
       {published.length > 0 && (
         <div className="mt-10">
           <h2 className="text-k-text font-semibold mb-3">Registro de Contenido Publicado</h2>
-          <div className="rounded-card-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-            <table className="w-full">
+          <div className="rounded-card-lg overflow-x-auto" style={{ border: '1px solid var(--color-border)' }}>
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="bg-k-surface" style={{ borderBottom: '1px solid var(--color-border)' }}>
                   {['Título', 'Cliente', 'Formato', 'Fecha publicación', 'Pilar', 'Acciones'].map(h => (

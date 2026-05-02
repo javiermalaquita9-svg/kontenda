@@ -93,7 +93,7 @@ export default function Dashboard() {
       {/* Alerta dinámica */}
       {pendingDeliveries.length > 0 && (
         <div
-          className="flex items-center justify-between bg-k-orange/10 rounded-card-lg px-4 py-3 mb-6"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-k-orange/10 rounded-card-lg px-4 py-3 mb-6"
           style={{ border: '1px solid rgba(232,106,26,0.25)' }}
         >
           <div className="flex items-center gap-2.5">
@@ -105,7 +105,7 @@ export default function Dashboard() {
           </div>
           <button
             onClick={() => navigate('/portal/contenido')}
-            className="text-k-orange text-sm hover:underline shrink-0 ml-4"
+            className="text-k-orange text-sm hover:underline shrink-0 self-start sm:ml-4"
           >
             Ir a Mi contenido →
           </button>
@@ -114,7 +114,7 @@ export default function Dashboard() {
 
       {/* Métricas */}
       {plan ? (
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
           <StatCard
             label="Piezas producidas"
             value={`${plan.producedPieces ?? 0} / ${plan.totalPieces ?? 0}`}
@@ -154,7 +154,7 @@ export default function Dashboard() {
       )}
 
       {/* Accesos rápidos */}
-      <div className="grid grid-cols-3 gap-4 mb-7">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 mb-7">
         {/* Mi contenido */}
         <button
           onClick={() => navigate('/portal/contenido')}
@@ -211,9 +211,9 @@ export default function Dashboard() {
       </div>
 
       {/* Entregas + contenido reciente */}
-      <div className="grid grid-cols-5 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
         {/* Entregas del mes */}
-        <div className="col-span-3">
+        <div className="md:col-span-3">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-k-text font-semibold text-sm">Entregas del mes</h2>
             <button
@@ -295,7 +295,7 @@ export default function Dashboard() {
         </div>
 
         {/* Contenido en proceso */}
-        <div className="col-span-2">
+        <div className="md:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-k-text font-semibold text-sm">Contenido en proceso</h2>
             <button

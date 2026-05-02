@@ -110,13 +110,13 @@ export default function CreatePiece() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-k-text text-2xl font-semibold">Crear Pieza</h1>
         <p className="text-k-muted text-sm mt-0.5">Nueva pieza de contenido</p>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* ── Columna izquierda ── */}
         <div className="flex flex-col gap-5 flex-[3]">
 
@@ -239,11 +239,11 @@ export default function CreatePiece() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3 mt-8 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
-        <button onClick={() => navigate('/admin/gestor')} className="px-5 py-2.5 rounded-card text-sm text-k-muted hover:text-k-text transition-colors" style={{ border: '1px solid var(--color-border)' }}>
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 mt-8 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
+        <button onClick={() => navigate('/admin/gestor')} className="w-full sm:w-auto px-5 py-2.5 rounded-card text-sm text-k-muted hover:text-k-text transition-colors" style={{ border: '1px solid var(--color-border)' }}>
           Cancelar
         </button>
-        <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-card text-sm font-medium bg-k-orange hover:bg-k-orange/90 text-white transition-colors disabled:opacity-50">
+        <button onClick={handleSave} disabled={saving} className="w-full sm:w-auto px-5 py-2.5 rounded-card text-sm font-medium bg-k-orange hover:bg-k-orange/90 text-white transition-colors disabled:opacity-50">
           {saving ? 'Guardando...' : 'Guardar pieza'}
         </button>
       </div>

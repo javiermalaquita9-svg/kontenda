@@ -1,4 +1,4 @@
-import { FiExternalLink, FiCheckCircle, FiClock, FiUploadCloud, FiFolder } from 'react-icons/fi'
+import { FiExternalLink, FiCheckCircle, FiClock, FiUploadCloud } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useAuth } from '../../hooks/useAuth'
 import { useMyBrand } from '../../hooks/useMyBrand'
@@ -154,7 +154,7 @@ export default function MyBrand() {
                   return (
                     <div
                       key={key}
-                      className="flex items-center justify-between px-4 py-3 rounded-card-lg"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 px-4 py-3 rounded-card-lg"
                       style={{ border: '1px solid var(--color-border)', background: 'var(--color-surface2)' }}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -164,7 +164,7 @@ export default function MyBrand() {
                           <p className="text-k-muted text-xs">{desc}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-3">
+                      <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 shrink-0 sm:ml-3">
                         <span className={`text-xs px-2 py-1 rounded font-medium ${cfg.cls}`}>
                           {cfg.label}
                         </span>

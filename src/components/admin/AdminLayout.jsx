@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
   FiPlusCircle, FiGrid, FiCalendar, FiUsers,
-  FiFileText, FiSettings, FiLogOut,
+  FiFileText, FiSettings, FiLogOut, FiMenu, FiX,
 } from 'react-icons/fi'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -16,12 +17,23 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
   const { user, signOut } = useAuth()
+  const [open, setOpen] = useState(false)
 
   return (
     <div className="flex min-h-screen bg-k-bg">
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className="fixed left-0 top-0 h-screen w-60 bg-k-surface flex flex-col z-30"
+        className={`fixed left-0 top-0 h-screen w-60 bg-k-surface flex flex-col z-30 transition-transform duration-200 ${
+          open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
         style={{ borderRight: '1px solid var(--color-border)' }}
       >
         {/* Logo */}
@@ -32,7 +44,10 @@ export default function AdminLayout() {
           <div className="w-8 h-8 bg-k-orange rounded-lg flex items-center justify-center shrink-0">
             <span className="text-white font-bold text-sm">K</span>
           </div>
-          <span className="text-k-text font-semibold text-lg tracking-tight">Kontenda</span>
+          <span className="text-k-text font-semibold text-lg tracking-tight flex-1">Kontenda</span>
+          <button onClick={() => setOpen(false)} className="md:hidden text-k-muted hover:text-k-text p-1">
+            <FiX size={18} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -41,6 +56,7 @@ export default function AdminLayout() {
             <NavLink
               key={to}
               to={to}
+              onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-card text-sm transition-colors ${
                   isActive
@@ -73,8 +89,22 @@ export default function AdminLayout() {
         </div>
       </aside>
 
+      {/* Mobile top bar */}
+      <header
+        className="fixed top-0 left-0 right-0 h-14 bg-k-surface z-10 flex items-center px-4 gap-3 md:hidden"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <button onClick={() => setOpen(true)} className="text-k-muted hover:text-k-text">
+          <FiMenu size={20} />
+        </button>
+        <div className="w-7 h-7 bg-k-orange rounded-md flex items-center justify-center shrink-0">
+          <span className="text-white font-bold text-xs">K</span>
+        </div>
+        <span className="text-k-text font-semibold">Kontenda</span>
+      </header>
+
       {/* Main content */}
-      <main className="flex-1 ml-60 min-h-screen">
+      <main className="flex-1 ml-0 md:ml-60 min-h-screen pt-14 md:pt-0">
         <Outlet />
       </main>
     </div>

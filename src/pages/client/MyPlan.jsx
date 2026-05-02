@@ -93,7 +93,7 @@ export default function MyPlan() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-5">
         <StatCard
           label="Piezas producidas"
           value={`${plan.producedPieces ?? 0} / ${plan.totalPieces ?? 0}`}
