@@ -377,7 +377,7 @@ export default function ContentManager() {
             <p className="text-k-muted text-sm">No hay piezas activas con estos filtros.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             {filtered.map(p => (
               <PieceCard key={p.id} piece={p} clients={clients} onView={setSelectedPiece} onDelete={handleDelete} />
             ))}

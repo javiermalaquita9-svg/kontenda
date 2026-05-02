@@ -158,7 +158,7 @@ export default function Scripts() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -194,7 +194,7 @@ export default function Scripts() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-k-muted text-sm mb-1.5">Cliente *</label>
               <select value={form.clientId} onChange={e => set('clientId', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
@@ -264,7 +264,7 @@ export default function Scripts() {
             <p className="text-k-muted text-sm">No hay ideas. Crea la primera.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             {ideas.map(idea => (
               <div key={idea.id} className="bg-k-surface rounded-card-lg p-5 flex flex-col gap-3" style={{ border: '1px solid var(--color-border)' }}>
                 <div className="flex items-start justify-between gap-2">
