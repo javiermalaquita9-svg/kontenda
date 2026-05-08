@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import {
-  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+  collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, // NEW: Import setDoc
 } from 'firebase/firestore'
-import {
+import { 
   FiPlus, FiEdit2, FiTrash2, FiArrowLeft, FiX, FiCheck, FiGlobe,
-  FiMapPin, FiFolder, FiInstagram, FiFacebook, FiYoutube,
+  FiMapPin, FiFolder, FiInstagram, FiFacebook, FiYoutube, FiEye, FiEyeOff, // NEW: Import FiEye, FiEyeOff
 } from 'react-icons/fi'
 import { SiTiktok } from 'react-icons/si'
+import { createAuthUser } from '../../firebase/auth' // NEW: Import createAuthUser
 import { db } from '../../firebase/config'
 import { useClients } from '../../hooks/useClients'
 import { useToast } from '../../context/ToastContext'
@@ -27,7 +28,8 @@ const DEFAULT_OBJECTIVES = ['Posicionamiento', 'Autoridad y Confianza', 'Convers
 const DEFAULT_FORMATS   = ['Reels/TikTok', 'Post', 'Carrusel', 'Story', 'Meta Ads']
 
 const BLANK_FORM = {
-  name: '', email: '', rut: '', address: '', description: '', logoUrl: '',
+  name: '', email: '', phone: '', rut: '', address: '', description: '', logoUrl: '', // NEW: Added phone field
+  password: '', // NEW: Add password field
   quickLinks: [],
   contentPillars: [...DEFAULT_PILLARS],
   objectives: [...DEFAULT_OBJECTIVES],
@@ -99,6 +101,7 @@ export default function ClientManager() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm]           = useState(BLANK_FORM)
   const [saving, setSaving]       = useState(false)
+  const [showPassword, setShowPassword] = useState(false) // NEW: State for password visibility
 
   // Quick link form
   const [linkForm, setLinkForm] = useState({ label: '', url: '', icon: 'instagram' })
@@ -115,10 +118,12 @@ export default function ClientManager() {
     setEditingId(client.id)
     setForm({
       name:           client.name          ?? '',
+      phone:          client.phone         ?? '', // NEW: Load phone for editing
       email:          client.email         ?? '',
       rut:            client.rut           ?? '',
       address:        client.address       ?? '',
       description:    client.description   ?? '',
+      password:       '', // Password is not loaded for security reasons
       logoUrl:        client.logoUrl       ?? '',
       quickLinks:     client.quickLinks    ?? [],
       contentPillars: client.contentPillars ?? [...DEFAULT_PILLARS],
@@ -131,19 +136,62 @@ export default function ClientManager() {
 
   async function handleSave() {
     if (!form.name.trim()) { showToast('El nombre del cliente es requerido.', 'error'); return }
+    if (!form.email.trim()) { showToast('El email del cliente es requerido.', 'error'); return }
+    
+    // NEW: Password validation for new clients
+    if (!editingId) { // Only for new clients
+      if (!form.password.trim()) { showToast('La contraseña es requerida para nuevos clientes.', 'error'); return }
+      if (form.password.length < 6) { // Firebase default minimum password length
+        showToast('La contraseña debe tener al menos 6 caracteres.', 'error'); return
+      }
+    }
+
     setSaving(true)
     try {
-      const data = { ...form }
+      const { password, ...clientData } = form // Separate password from client data
+      let clientIdToUse = editingId;
+
       if (editingId) {
-        await updateDoc(doc(db, 'clients', editingId), data)
+        await updateDoc(doc(db, 'clients', editingId), clientData)
         showToast('Cliente actualizado.')
       } else {
-        await addDoc(collection(db, 'clients'), { ...data, createdAt: serverTimestamp() })
+        // 1. Crear usuario en Firebase Auth PRIMERO para validar que el email esté disponible
+        const firebaseUser = await createAuthUser(form.email, password)
+
+        // 2. Si Auth es exitoso, crear documento del cliente en Firestore
+        const clientRef = await addDoc(collection(db, 'clients'), { ...clientData, createdAt: serverTimestamp() })
+        clientIdToUse = clientRef.id; // Obtener el ID recién creado
+
+        // 3. Create user document in Firestore (linking Firebase UID to client ID and role)
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          role: 'client',
+          clientId: clientIdToUse,
+        })
         showToast('Cliente creado.')
       }
       setView('list')
-    } catch {
-      showToast('Error al guardar. Intenta nuevamente.', 'error')
+    } catch (error) { // Catch the error object
+      console.error("Error al guardar cliente o crear usuario:", error); // Log the full error for debugging
+
+      let errorMessage = 'Error al guardar. Intenta nuevamente.';
+      // Check for specific Firebase Auth errors
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'El email ya está registrado. Usa otro o edita el cliente existente.';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'El formato del email es inválido.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'La contraseña es muy débil. Debe tener al menos 6 caracteres.';
+            break;
+          default:
+            errorMessage = `Error de autenticación: ${error.message}`;
+            break;
+        }
+      }
+      showToast(errorMessage, 'error')
     } finally {
       setSaving(false)
     }
@@ -177,7 +225,7 @@ export default function ClientManager() {
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-k-text text-2xl font-semibold">Gestión de Clientes</h1>
+            <h1 className="text-k-text text-2xl font-semibold">Registro de Clientes</h1> {/* MODIFIED: Title change */}
             <p className="text-k-muted text-sm mt-0.5">{clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}</p>
           </div>
           <button onClick={openNew} className="flex items-center gap-2 bg-k-orange hover:bg-k-orange/90 text-white text-sm font-medium px-4 py-2.5 rounded-card transition-colors">
@@ -197,7 +245,6 @@ export default function ClientManager() {
         ) : (
           <div className="grid grid-cols-3 gap-4">
             {clients.map(client => {
-              const Icon = LINK_ICONS[client.quickLinks?.[0]?.icon]?.Icon
               return (
                 <div key={client.id} className="bg-k-surface rounded-card-lg p-5 flex flex-col gap-3" style={{ border: '1px solid var(--color-border)' }}>
                   <div className="flex items-center gap-3">
@@ -254,9 +301,7 @@ export default function ClientManager() {
         <button onClick={() => setView('list')} className="text-k-muted hover:text-k-text transition-colors">
           <FiArrowLeft size={20} />
         </button>
-        <h1 className="text-k-text text-2xl font-semibold">
-          {editingId ? 'Editar Cliente' : 'Nuevo Cliente'}
-        </h1>
+        <h1 className="text-k-text text-2xl font-semibold">{editingId ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}</h1> {/* MODIFIED: Title change */}
       </div>
 
       <div className="flex flex-col gap-4">
@@ -269,12 +314,28 @@ export default function ClientManager() {
             <Field label="Correo electrónico">
               <input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@ejemplo.com" className={INP} style={INP_STYLE} />
             </Field>
+            <Field label="Teléfono"> {/* NEW: Phone field */}
+              <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+56912345678" className={INP} style={INP_STYLE} />
+            </Field>
             <Field label="RUT">
               <input value={form.rut} onChange={e => set('rut', e.target.value)} placeholder="12.345.678-9" className={INP} style={INP_STYLE} />
             </Field>
             <Field label="Dirección">
               <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="Av. Principal 123" className={INP} style={INP_STYLE} />
             </Field>
+            {!editingId && ( // NEW: Password field only for new clients
+              <Field label="Contraseña (para login) *">
+                <div className="relative"> {/* NEW: Wrapper for icon */}
+                  <input
+                    type={showPassword ? 'text' : 'password'} // NEW: Dynamic type
+                    value={form.password} onChange={e => set('password', e.target.value)} placeholder="••••••••" className={INP} style={INP_STYLE}
+                  />
+                  <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-k-muted hover:text-k-text transition-colors"> {/* NEW: Toggle button */}
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
+              </Field>
+            )}
           </div>
           <div className="mt-4">
             <Field label="Descripción del negocio">
@@ -302,7 +363,7 @@ export default function ClientManager() {
           {form.quickLinks.length > 0 && (
             <div className="flex flex-col gap-2 mb-4">
               {form.quickLinks.map((lk, i) => {
-                const { Icon, label } = LINK_ICONS[lk.icon] ?? { Icon: FiGlobe, label: 'Web' }
+                const { Icon } = LINK_ICONS[lk.icon] ?? { Icon: FiGlobe, label: 'Web' }
                 return (
                   <div key={i} className="flex items-center gap-2 bg-k-surface2 px-3 py-2 rounded-card" style={{ border: '1px solid var(--color-border)' }}>
                     <Icon size={14} className="text-k-muted shrink-0" />

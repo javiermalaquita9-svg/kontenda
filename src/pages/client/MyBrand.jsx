@@ -1,7 +1,8 @@
-import { FiExternalLink, FiCheckCircle, FiClock, FiUploadCloud } from 'react-icons/fi'
+import { FiCheckCircle, FiClock, FiUploadCloud } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useAuth } from '../../hooks/useAuth'
 import { useMyBrand } from '../../hooks/useMyBrand'
+import { useNavigate } from 'react-router-dom'
 
 const WA_NUMBER = '56968280822'
 
@@ -9,7 +10,7 @@ const ASSET_SLOTS = [
   {
     key:     'briefStatus',
     linkKey: 'briefDriveLink',
-    label:   'Brief completado',
+    label:   'Manual de marca',
     desc:    'PDF / Google Doc / Word',
   },
   {
@@ -21,8 +22,8 @@ const ASSET_SLOTS = [
   {
     key:     'photosStatus',
     linkKey: 'photosDriveLink',
-    label:   'Fotos de la empresa',
-    desc:    'JPG o PNG de producto o equipo',
+    label:   'Buyer persona',
+    desc:    'Documento o imagen de tu cliente ideal',
   },
   {
     key:     'referencesStatus',
@@ -55,6 +56,7 @@ function StepNumber({ n, active, done }) {
 export default function MyBrand() {
   const { clientId } = useAuth()
   const { brand, loading } = useMyBrand(clientId)
+  const navigate = useNavigate()
 
   if (loading) {
     return (
@@ -66,7 +68,7 @@ export default function MyBrand() {
 
   const allReviewed = brand?.brandKitReady
 
-  const step1Done = Boolean(brand?.briefTemplateUrl) || Boolean(brand)
+  const step1Done = Boolean(brand)
   const step2Done = ASSET_SLOTS.some(s => (brand?.[s.key] ?? 'pending') !== 'pending')
   const step3Done = allReviewed
 
@@ -107,25 +109,18 @@ export default function MyBrand() {
           <div className="flex items-start gap-4">
             <StepNumber n={1} active={activeStep === 1} done={step1Done} />
             <div className="flex-1 min-w-0">
-              <p className="text-k-text font-semibold text-sm mb-0.5">Descarga la plantilla de brief</p>
+              <p className="text-k-text font-semibold text-sm mb-0.5">Completa el formulario de marca</p>
               <p className="text-k-muted text-xs mb-4">
-                Completa el brief para que podamos crear contenido alineado con tu marca.
+                Llena este formulario para que podamos crear contenido alineado con tu marca.
               </p>
-              {brand?.briefTemplateUrl ? (
-                <a
-                  href={brand.briefTemplateUrl}
-                  target="_blank"
-                  rel="noreferrer"
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => navigate('/portal/formulario-marca')}
                   className="inline-flex items-center gap-2 text-sm text-white bg-k-orange hover:bg-k-orange/90 px-4 py-2 rounded-card transition-colors"
                 >
-                  <FiExternalLink size={14} />
-                  Abrir plantilla de Brief
-                </a>
-              ) : (
-                <p className="text-k-muted text-xs italic">
-                  La plantilla aún no está disponible. Contáctanos para recibirla.
-                </p>
-              )}
+                  Llenar Formulario Web
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -140,7 +135,7 @@ export default function MyBrand() {
             <div className="flex-1 min-w-0">
               <p className="text-k-text font-semibold text-sm mb-0.5">Sube tus archivos al Drive</p>
               <p className="text-k-muted text-xs mb-4">
-                Sube el brief completado, tu logo, fotos y referencias a la carpeta compartida de Drive.
+                Sube el manual de marca, tu logo, el buyer persona y referencias a la carpeta compartida de Drive.
               </p>
 
               {/* Estado de cada archivo con su carpeta de Drive */}
@@ -150,6 +145,13 @@ export default function MyBrand() {
                   const driveUrl = brand?.[linkKey] ?? ''
                   const cfg  = STATUS_CFG[status] ?? STATUS_CFG.pending
                   const Icon = cfg.icon
+
+                  let displayLabel = cfg.label
+                  let displayCls = cfg.cls
+                  if (status === 'pending' && driveUrl) {
+                    displayLabel = 'Disponible'
+                    displayCls = 'bg-k-surface2 text-k-text'
+                  }
 
                   return (
                     <div
@@ -165,8 +167,8 @@ export default function MyBrand() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 shrink-0 sm:ml-3">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${cfg.cls}`}>
-                          {cfg.label}
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${displayCls}`}>
+                          {displayLabel}
                         </span>
                         {driveUrl ? (
                           <a

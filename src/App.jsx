@@ -20,6 +20,8 @@ import MyGestor     from './pages/client/MyGestor'
 import MyPlan       from './pages/client/MyPlan'
 import MyBrand      from './pages/client/MyBrand'
 import Subscription from './pages/client/Subscription'
+import ClientBrandView from './pages/admin/ClientBrandView' // NEW: Import the new admin component
+import BrandForm    from './pages/client/BrandForm'
 
 function RootRedirect() {
   const { user, role, loading } = useAuth()
@@ -46,6 +48,7 @@ function AppRoutes() {
           <Route path="clientes"   element={<ClientManager />} />
           <Route path="guiones"    element={<Scripts />} />
           <Route path="panel"      element={<AdminPanel />} />
+          <Route path="clientes/:clientId/marca" element={<ClientBrandView />} /> {/* NEW: Route for admin to view client brand form */}
         </Route>
       </Route>
 
@@ -59,6 +62,7 @@ function AppRoutes() {
           <Route path="plan"       element={<MyPlan />} />
           <Route path="marca"      element={<MyBrand />} />
           <Route path="suscripcion" element={<Subscription />} />
+          <Route path="formulario-marca" element={<BrandForm />} />
         </Route>
       </Route>
 

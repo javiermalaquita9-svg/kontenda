@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, setDoc,
-  onSnapshot, query, orderBy, increment, serverTimestamp,
+  onSnapshot, query, orderBy, increment,
 } from 'firebase/firestore'
-import { FiPlus, FiX, FiEdit2, FiTrash2, FiRefreshCw, FiCheck } from 'react-icons/fi'
+import { FiPlus, FiX, FiEdit2, FiTrash2, FiRefreshCw, FiCheck, FiFileText } from 'react-icons/fi'
 import { db } from '../../firebase/config'
 import { useClients } from '../../hooks/useClients'
 import { useToast } from '../../context/ToastContext'
 import { tsToInput, inputToTs } from '../../utils/date'
 import RoundIndicator from '../../components/shared/RoundIndicator'
+import ClientBrandView from './ClientBrandView'
 
 // ── Constants ──────────────────────────────────────────────────
 const PLAN_NAMES    = ['Plan Basic', 'Plan Emprendedor', 'Plan Pro']
@@ -22,9 +23,9 @@ const ASSET_CLS     = {
   reviewed: 'bg-green-500/10 text-green-400',
 }
 const ASSET_SLOTS = [
-  { key: 'briefStatus',      linkKey: 'briefDriveLink',      label: 'Brief completado' },
+  { key: 'briefStatus',      linkKey: 'briefDriveLink',      label: 'Manual de marca' },
   { key: 'logoStatus',       linkKey: 'logoDriveLink',       label: 'Logo (AI/SVG/PNG)' },
-  { key: 'photosStatus',     linkKey: 'photosDriveLink',     label: 'Fotos de la empresa' },
+  { key: 'photosStatus',     linkKey: 'photosDriveLink',     label: 'Buyer persona' },
   { key: 'referencesStatus', linkKey: 'referencesDriveLink', label: 'Referencias visuales' },
 ]
 
@@ -83,12 +84,20 @@ export default function AdminPanel() {
   const [delForm,     setDelForm]     = useState(null)   // null | delivery object
   const [editingDelId, setEditingDelId] = useState(null)
   const [savingDel,   setSavingDel]   = useState(false)
+  const [brandViewClientId, setBrandViewClientId] = useState(null)
   const [includeInput,  setIncludeInput]  = useState('')
   const [paymentInput,  setPaymentInput]  = useState({ date: '', planName: '', amount: '', currency: '' })
 
   // Subscribe to client data
   useEffect(() => {
-    if (!clientId) { setPlan(null); setDeliveries([]); setAssets(null); return }
+    if (!clientId) {
+      Promise.resolve().then(() => {
+        setPlan(null)
+        setDeliveries([])
+        setAssets(null)
+      })
+      return
+    }
     const subs = []
 
     subs.push(onSnapshot(
@@ -308,7 +317,17 @@ export default function AdminPanel() {
 
           {/* ── SECCIÓN 1: Plan ── */}
           <div className="bg-k-surface rounded-card-lg p-6" style={{ border: '1px solid var(--color-border)' }}>
-            <SectionTitle>Plan del cliente</SectionTitle>
+            <div className="flex items-start justify-between mb-1">
+              <SectionTitle>Plan del cliente</SectionTitle>
+              <button 
+                onClick={() => setBrandViewClientId(clientId)}
+                className="flex items-center gap-2 text-sm text-k-text bg-k-surface2 hover:bg-k-surface2/80 px-3 py-1.5 rounded-card transition-colors"
+                style={{ border: '1px solid var(--color-border)' }}
+              >
+                <FiFileText size={14} className="text-k-orange" />
+                Ver datos del formulario
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-4 mb-4">
               <Field label="Nombre del plan">
                 <select value={planForm.planName} onChange={e => setP('planName', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
@@ -319,7 +338,10 @@ export default function AdminPanel() {
                 <input type="number" value={planForm.planPrice} onChange={e => setP('planPrice', e.target.value)} placeholder="0" className={INP} style={INP_S} />
               </Field>
               <Field label="Moneda">
-                <input value={planForm.currency} onChange={e => setP('currency', e.target.value)} placeholder="USD" className={INP} style={INP_S} />
+                <select value={planForm.currency} onChange={e => setP('currency', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
+                  <option value="USD">Dólares (USD)</option>
+                  <option value="CLP">Pesos chilenos (CLP)</option>
+                </select>
               </Field>
               <Field label="Estado">
                 <select value={planForm.status} onChange={e => setP('status', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
@@ -636,6 +658,23 @@ export default function AdminPanel() {
 
           </div>
 
+        </div>
+      )}
+
+      {/* Brand Form Data Modal */}
+      {brandViewClientId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-k-bg rounded-card-lg w-full max-w-4xl h-[90vh] flex flex-col" style={{ border: '1px solid var(--color-border)' }}>
+            <div className="flex items-center justify-between p-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <h2 className="text-k-text text-lg font-semibold">Información de Marca</h2>
+              <button onClick={() => setBrandViewClientId(null)} className="text-k-muted hover:text-k-text">
+                <FiX size={20} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-6">
+              <ClientBrandView clientId={brandViewClientId} isModal />
+            </div>
+          </div>
         </div>
       )}
     </div>
