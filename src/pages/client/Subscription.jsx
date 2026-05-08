@@ -44,7 +44,6 @@ export default function Subscription() {
   const { clientId } = useAuth()
   const { plan, loading } = useMyPlan(clientId)
 
-  const [showPause,  setShowPause]  = useState(false)
   const [showCancel, setShowCancel] = useState(false)
 
   if (loading) {
@@ -77,7 +76,6 @@ export default function Subscription() {
   const today       = new Date()
   const canCancelNow = cancelDate && today >= cancelDate
 
-  const pauseMsg  = `Hola Liu Creativo, quiero pausar mi suscripción al plan ${plan.planName}. Por favor indíquenme los próximos pasos.`
   const cancelMsg = `Hola Liu Creativo, quiero cancelar mi suscripción al plan ${plan.planName}. Por favor indíquenme los próximos pasos.`
 
   const payments = plan.payments ?? []
@@ -183,40 +181,10 @@ export default function Subscription() {
             <FiExternalLink size={15} />
           </a>
 
-          {/* Pausar */}
-          <div>
-            <button
-              onClick={() => { setShowPause(p => !p); setShowCancel(false) }}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-card text-k-muted hover:text-k-text transition-colors"
-              style={{ border: '1px solid var(--color-border)' }}
-            >
-              <span className="text-sm">Pausar suscripción</span>
-              {showPause ? <FiChevronUp size={15} /> : <FiChevronDown size={15} />}
-            </button>
-            {showPause && (
-              <div
-                className="mt-1 px-4 py-3 rounded-card bg-k-surface2 flex items-center justify-between gap-3"
-                style={{ border: '1px solid var(--color-border)' }}
-              >
-                <p className="text-k-muted text-sm">
-                  Para pausar escríbenos por WhatsApp y te ayudamos.
-                </p>
-                <a
-                  href={waLink(WA_NUMBER, pauseMsg)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 bg-green-500/10 px-3 py-1.5 rounded-card shrink-0 transition-colors"
-                >
-                  <FaWhatsapp size={13} /> Escribir
-                </a>
-              </div>
-            )}
-          </div>
-
           {/* Cancelar */}
           <div>
             <button
-              onClick={() => { setShowCancel(p => !p); setShowPause(false) }}
+              onClick={() => setShowCancel(p => !p)}
               className="w-full flex items-center justify-between px-4 py-3 rounded-card text-k-muted hover:text-red-400 transition-colors"
               style={{ border: '1px solid var(--color-border)' }}
             >

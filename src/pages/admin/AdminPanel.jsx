@@ -32,7 +32,7 @@ const ASSET_SLOTS = [
 const BLANK_PLAN = {
   planName: 'Plan Basic', planTitle: '', planPrice: '', currency: 'USD', status: 'active',
   startDate: '', nextBilling: '', monthsActive: 0, minMonths: 3,
-  totalPieces: 0, producedPieces: 0, includes: [], payments: [],
+  totalPieces: 0, producedPieces: 0, includes: [], payments: [], brandFormType: 'small',
 }
 
 const BLANK_DELIVERY = {
@@ -119,6 +119,7 @@ export default function AdminPanel() {
           producedPieces: d.producedPieces ?? 0,
           includes:      d.includes      ?? [],
           payments:      d.payments      ?? [],
+          brandFormType: d.brandFormType ?? 'small',
         } : { ...BLANK_PLAN })
       }
     ))
@@ -162,6 +163,7 @@ export default function AdminPanel() {
           nextBilling:    inputToTs(planForm.nextBilling),
           payments:       planForm.payments,
           planTitle:      planForm.planTitle ?? '',
+          brandFormType:  planForm.brandFormType ?? 'small',
         },
         { merge: true }
       )
@@ -328,7 +330,7 @@ export default function AdminPanel() {
                 Ver datos del formulario
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <Field label="Nombre del plan">
                 <select value={planForm.planName} onChange={e => setP('planName', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
                   {PLAN_NAMES.map(n => <option key={n}>{n}</option>)}
@@ -346,6 +348,12 @@ export default function AdminPanel() {
               <Field label="Estado">
                 <select value={planForm.status} onChange={e => setP('status', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
                   {STATUS_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </Field>
+              <Field label="Tipo de Formulario de Marca">
+                <select value={planForm.brandFormType} onChange={e => setP('brandFormType', e.target.value)} className={`${INP} cursor-pointer`} style={INP_S}>
+                  <option value="small">Pequeñas Empresas</option>
+                  <option value="large">Medianas/Grandes Empresas</option>
                 </select>
               </Field>
               <Field label="Inicio del plan">
