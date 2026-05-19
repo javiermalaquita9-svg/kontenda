@@ -1,6 +1,6 @@
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth, firebaseConfig } from './config'; // Asegúrate de exportar firebaseConfig en config.js
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updatePassword, sendPasswordResetEmail } from 'firebase/auth';
+import { auth, firebaseConfig } from './config';
 
 export async function signInWithEmail(email, password) {
   await signInWithEmailAndPassword(auth, email, password);
@@ -10,16 +10,29 @@ export async function logOut() {
   await signOut(auth);
 }
 
-// Nueva función para crear un usuario en Firebase Authentication
 export async function createAuthUser(email, password) {
-  // Creamos una instancia secundaria temporal para no afectar la sesión del admin
-  const secondaryApp = initializeApp(firebaseConfig, 'Secondary');
-  const secondaryAuth = getAuth(secondaryApp);
+  const secondaryApp = initializeApp(firebaseConfig, `Secondary_${Date.now()}`)
+  const secondaryAuth = getAuth(secondaryApp)
+  try {
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password)
+    return userCredential.user
+  } finally {
+    await deleteApp(secondaryApp)
+  }
+}
 
-  const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-  
-  // Cerramos la instancia secundaria inmediatamente después de crear al usuario
-  await deleteApp(secondaryApp);
-  
-  return userCredential.user; // Retorna el objeto User de Firebase
+export async function sendResetEmail(email) {
+  await sendPasswordResetEmail(auth, email)
+}
+
+// Cambia la contraseña de otro usuario autenticándose como él en una app secundaria
+export async function changeAuthUserPassword(email, currentPassword, newPassword) {
+  const secondaryApp = initializeApp(firebaseConfig, `Secondary_${Date.now()}`)
+  const secondaryAuth = getAuth(secondaryApp)
+  try {
+    const { user } = await signInWithEmailAndPassword(secondaryAuth, email, currentPassword)
+    await updatePassword(user, newPassword)
+  } finally {
+    await deleteApp(secondaryApp)
+  }
 }

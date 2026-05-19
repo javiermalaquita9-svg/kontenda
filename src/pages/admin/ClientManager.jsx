@@ -2,12 +2,12 @@ import { useState } from 'react'
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, // NEW: Import setDoc
 } from 'firebase/firestore'
-import { 
+import {
   FiPlus, FiEdit2, FiTrash2, FiArrowLeft, FiX, FiCheck, FiGlobe,
-  FiMapPin, FiFolder, FiInstagram, FiFacebook, FiYoutube, FiEye, FiEyeOff, // NEW: Import FiEye, FiEyeOff
+  FiMapPin, FiFolder, FiInstagram, FiFacebook, FiYoutube, FiEye, FiEyeOff, FiMail,
 } from 'react-icons/fi'
 import { SiTiktok } from 'react-icons/si'
-import { createAuthUser } from '../../firebase/auth' // NEW: Import createAuthUser
+import { createAuthUser, changeAuthUserPassword, sendResetEmail } from '../../firebase/auth'
 import { db } from '../../firebase/config'
 import { useClients } from '../../hooks/useClients'
 import { useToast } from '../../context/ToastContext'
@@ -100,8 +100,15 @@ export default function ClientManager() {
   const [view, setView]           = useState('list')
   const [editingId, setEditingId] = useState(null)
   const [form, setForm]           = useState(BLANK_FORM)
-  const [saving, setSaving]       = useState(false)
-  const [showPassword, setShowPassword] = useState(false) // NEW: State for password visibility
+  const [saving, setSaving]             = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  // Change password panel (edit mode)
+  const [pwPanel, setPwPanel]           = useState(false)
+  const [newPw, setNewPw]               = useState('')
+  const [showNewPw, setShowNewPw]       = useState(false)
+  const [savingPw, setSavingPw]         = useState(false)
+  const [sendingReset, setSendingReset] = useState(false)
 
   // Quick link form
   const [linkForm, setLinkForm] = useState({ label: '', url: '', icon: 'instagram' })
@@ -117,20 +124,22 @@ export default function ClientManager() {
   function openEdit(client) {
     setEditingId(client.id)
     setForm({
-      name:           client.name          ?? '',
-      phone:          client.phone         ?? '', // NEW: Load phone for editing
-      email:          client.email         ?? '',
-      rut:            client.rut           ?? '',
-      address:        client.address       ?? '',
-      description:    client.description   ?? '',
-      password:       '', // Password is not loaded for security reasons
-      logoUrl:        client.logoUrl       ?? '',
-      quickLinks:     client.quickLinks    ?? [],
+      name:           client.name           ?? '',
+      phone:          client.phone          ?? '',
+      email:          client.email          ?? '',
+      rut:            client.rut            ?? '',
+      address:        client.address        ?? '',
+      description:    client.description    ?? '',
+      password:       client.loginPassword  ?? '',
+      logoUrl:        client.logoUrl        ?? '',
+      quickLinks:     client.quickLinks     ?? [],
       contentPillars: client.contentPillars ?? [...DEFAULT_PILLARS],
-      objectives:     client.objectives    ?? [...DEFAULT_OBJECTIVES],
-      tags:           client.tags          ?? [],
-      formats:        client.formats       ?? [...DEFAULT_FORMATS],
+      objectives:     client.objectives     ?? [...DEFAULT_OBJECTIVES],
+      tags:           client.tags           ?? [],
+      formats:        client.formats        ?? [...DEFAULT_FORMATS],
     })
+    setPwPanel(false)
+    setNewPw('')
     setView('form')
   }
 
@@ -159,13 +168,15 @@ export default function ClientManager() {
         const firebaseUser = await createAuthUser(form.email, password)
 
         // 2. Si Auth es exitoso, crear documento del cliente en Firestore
-        const clientRef = await addDoc(collection(db, 'clients'), { ...clientData, createdAt: serverTimestamp() })
+        const clientRef = await addDoc(collection(db, 'clients'), { ...clientData, loginPassword: password, createdAt: serverTimestamp() })
         clientIdToUse = clientRef.id; // Obtener el ID recién creado
 
         // 3. Create user document in Firestore (linking Firebase UID to client ID and role)
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           role: 'client',
           clientId: clientIdToUse,
+          email: form.email,
+          displayName: form.name,
         })
         showToast('Cliente creado.')
       }
@@ -194,6 +205,46 @@ export default function ClientManager() {
       showToast(errorMessage, 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleChangePassword() {
+    if (newPw.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres.', 'error'); return }
+    if (!form.password) {
+      showToast('Este cliente no tiene contraseña guardada. Resetéala primero desde Firebase Console → Authentication.', 'error')
+      return
+    }
+    setSavingPw(true)
+    try {
+      await changeAuthUserPassword(form.email, form.password, newPw)
+      await updateDoc(doc(db, 'clients', editingId), { loginPassword: newPw })
+      set('password', newPw)
+      setNewPw('')
+      setPwPanel(false)
+      showToast('Contraseña actualizada correctamente.')
+    } catch (error) {
+      const msg = (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential')
+        ? 'La contraseña actual guardada es incorrecta. Actualízala desde Firebase Console y vuelve a intentar.'
+        : `Error al cambiar contraseña: ${error.message}`
+      showToast(msg, 'error')
+    } finally {
+      setSavingPw(false)
+    }
+  }
+
+  async function handleSendResetEmail() {
+    if (!form.email) { showToast('Este cliente no tiene email registrado.', 'error'); return }
+    setSendingReset(true)
+    try {
+      await sendResetEmail(form.email)
+      showToast(`Correo de restablecimiento enviado a ${form.email}.`)
+    } catch (error) {
+      const msg = error.code === 'auth/user-not-found'
+        ? 'No existe un usuario con ese email en Firebase Auth.'
+        : `Error al enviar el correo: ${error.message}`
+      showToast(msg, 'error')
+    } finally {
+      setSendingReset(false)
     }
   }
 
@@ -307,36 +358,97 @@ export default function ClientManager() {
       <div className="flex flex-col gap-4">
         {/* Sección 1 — Datos */}
         <Section title="Datos del cliente">
+          {/* Campos señuelo ocultos para evitar que el navegador autocomplete con credenciales del admin */}
+          <input type="text" autoComplete="username" style={{ display: 'none' }} aria-hidden="true" tabIndex={-1} />
+          <input type="password" autoComplete="current-password" style={{ display: 'none' }} aria-hidden="true" tabIndex={-1} />
           <div className="grid grid-cols-2 gap-4">
             <Field label="Nombre completo *">
-              <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nombre del cliente" className={INP} style={INP_STYLE} />
+              <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nombre del cliente" autoComplete="off" name="cliente-nombre" className={INP} style={INP_STYLE} />
             </Field>
             <Field label="Correo electrónico">
-              <input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@ejemplo.com" className={INP} style={INP_STYLE} />
+              <input type="text" inputMode="email" value={form.email} onChange={e => set('email', e.target.value)} autoComplete="off" name="cliente-correo" placeholder="email@ejemplo.com" className={INP} style={INP_STYLE} />
             </Field>
-            <Field label="Teléfono"> {/* NEW: Phone field */}
-              <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+56912345678" className={INP} style={INP_STYLE} />
+            <Field label="Teléfono">
+              <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+56912345678" autoComplete="off" name="cliente-telefono" className={INP} style={INP_STYLE} />
             </Field>
             <Field label="RUT">
-              <input value={form.rut} onChange={e => set('rut', e.target.value)} placeholder="12.345.678-9" className={INP} style={INP_STYLE} />
+              <input value={form.rut} onChange={e => set('rut', e.target.value)} placeholder="12.345.678-9" autoComplete="off" name="cliente-rut" className={INP} style={INP_STYLE} />
             </Field>
             <Field label="Dirección">
-              <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="Av. Principal 123" className={INP} style={INP_STYLE} />
+              <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="Av. Principal 123" autoComplete="off" name="cliente-direccion" className={INP} style={INP_STYLE} />
             </Field>
-            {!editingId && ( // NEW: Password field only for new clients
-              <Field label="Contraseña (para login) *">
-                <div className="relative"> {/* NEW: Wrapper for icon */}
-                  <input
-                    type={showPassword ? 'text' : 'password'} // NEW: Dynamic type
-                    value={form.password} onChange={e => set('password', e.target.value)} placeholder="••••••••" className={INP} style={INP_STYLE}
-                  />
-                  <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-k-muted hover:text-k-text transition-colors"> {/* NEW: Toggle button */}
+            <Field label={editingId ? 'Contraseña de acceso' : 'Contraseña del cliente *'}>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={editingId ? undefined : e => set('password', e.target.value)}
+                  readOnly={!!editingId}
+                  autoComplete="new-password"
+                  name="cliente-password"
+                  placeholder={editingId ? '(no registrada)' : '••••••••'}
+                  className={`${INP} ${editingId ? 'opacity-60 cursor-default pr-24' : ''}`}
+                  style={INP_STYLE}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {editingId && (
+                    <button type="button" onClick={() => { setPwPanel(p => !p); setNewPw('') }}
+                      className="text-xs text-k-orange hover:text-k-orange/80 font-medium transition-colors">
+                      Cambiar
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setShowPassword(p => !p)} className="text-k-muted hover:text-k-text transition-colors">
                     {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                   </button>
                 </div>
-              </Field>
-            )}
+              </div>
+
+              {/* Panel de cambio de contraseña */}
+              {editingId && pwPanel && (
+                <div className="mt-3 p-4 bg-k-surface2 rounded-card flex flex-col gap-3" style={{ border: '1px solid var(--color-border)' }}>
+                  <p className="text-k-muted text-xs">Nueva contraseña para <span className="text-k-text">{form.email}</span></p>
+                  <div className="relative">
+                    <input
+                      type={showNewPw ? 'text' : 'password'}
+                      value={newPw}
+                      onChange={e => setNewPw(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleChangePassword() }}
+                      autoComplete="new-password"
+                      name="cliente-nueva-password"
+                      placeholder="Nueva contraseña (mín. 6 caracteres)"
+                      className={`${INP} pr-10`}
+                      style={INP_STYLE}
+                    />
+                    <button type="button" onClick={() => setShowNewPw(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-k-muted hover:text-k-text transition-colors">
+                      {showNewPw ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                    </button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button type="button" onClick={handleChangePassword} disabled={savingPw || !newPw}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-k-orange hover:bg-k-orange/90 text-white text-xs font-medium rounded-card transition-colors disabled:opacity-50">
+                      <FiCheck size={13} />
+                      {savingPw ? 'Guardando...' : 'Guardar contraseña'}
+                    </button>
+                    <button type="button" onClick={() => { setPwPanel(false); setNewPw('') }}
+                      className="px-4 py-2 text-k-muted hover:text-k-text text-xs rounded-card transition-colors" style={{ border: '1px solid var(--color-border)' }}>
+                      Cancelar
+                    </button>
+                    <button type="button" onClick={handleSendResetEmail} disabled={sendingReset}
+                      className="flex items-center gap-1.5 px-4 py-2 text-k-muted hover:text-k-text text-xs rounded-card transition-colors disabled:opacity-50 ml-auto" style={{ border: '1px solid var(--color-border)' }}>
+                      <FiMail size={13} />
+                      {sendingReset ? 'Enviando...' : 'Enviar reset por email'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Field>
           </div>
+          {!editingId && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-k-lila/20 text-k-lila font-medium">Rol: cliente</span>
+              <span className="text-k-muted text-xs">Se asignará automáticamente al crear la cuenta</span>
+            </div>
+          )}
           <div className="mt-4">
             <Field label="Descripción del negocio">
               <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} placeholder="¿A qué se dedica este cliente?" className={`${INP} resize-none`} style={INP_STYLE} />
