@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import {
   FiGrid, FiList, FiExternalLink, FiEdit2, FiTrash2, FiX,
-  FiArrowLeft, FiFolder, FiVideo,
+  FiArrowLeft, FiFolder, FiVideo, FiMessageCircle,
 } from 'react-icons/fi'
 import { db } from '../../firebase/config'
 import { useClients } from '../../hooks/useClients'
@@ -35,15 +35,27 @@ const INP_S = { border: '1px solid var(--color-border)' }
 // ── Piece card ──────────────────────────────────────────────────
 function PieceCard({ piece, clients, onView, onDelete }) {
   const client = clients.find(c => c.id === piece.clientId)
-  const mainPillar = PILLAR_KEYS.reduce((max, pk) =>
-    (piece.pillars?.[pk.key] ?? 0) > (piece.pillars?.[max.key] ?? 0) ? pk : max
-  , PILLAR_KEYS[0])
+  const pillarsEntries = Object.entries(piece.pillars ?? {})
+  const mainPillarLabel = pillarsEntries.length
+    ? pillarsEntries.reduce((max, e) => e[1] > max[1] ? e : max)[0]
+    : ''
+  const unread = piece.unreadByAdmin ?? 0
+  const rounds = piece.reviewRounds ?? 0
+  const maxRounds = piece.maxReviewRounds ?? 3
+  const roundsLeft = maxRounds - rounds
 
   return (
     <div className="bg-k-surface rounded-card-lg p-4 flex flex-col gap-3" style={{ border: '1px solid var(--color-border)' }}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-k-text font-medium text-sm leading-snug">{piece.title}</p>
-        <StatusBadge status={piece.status} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {unread > 0 && (
+            <span className="flex items-center gap-1 bg-k-orange text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              <FiMessageCircle size={10} />{unread}
+            </span>
+          )}
+          <StatusBadge status={piece.status} />
+        </div>
       </div>
 
       {/* Client */}
@@ -57,7 +69,19 @@ function PieceCard({ piece, clients, onView, onDelete }) {
 
       <div className="flex flex-wrap gap-1.5">
         {piece.format && <FormatBadge format={piece.format} />}
-        <span className="text-k-muted text-xs">{mainPillar.label}</span>
+        {mainPillarLabel && <span className="text-k-muted text-xs">{mainPillarLabel}</span>}
+      </div>
+
+      {/* Review rounds indicator */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1">
+          {Array.from({ length: maxRounds }).map((_, i) => (
+            <div key={i} className={`h-1.5 w-5 rounded-full ${i < rounds ? 'bg-k-orange' : 'bg-k-surface2'}`} />
+          ))}
+        </div>
+        <span className={`text-[10px] font-medium ${roundsLeft === 0 ? 'text-red-400' : 'text-k-muted'}`}>
+          {roundsLeft === 0 ? 'Sin correcciones' : `${roundsLeft} corrección${roundsLeft !== 1 ? 'es' : ''} disponible${roundsLeft !== 1 ? 's' : ''}`}
+        </span>
       </div>
 
       <div className="text-k-muted text-xs">{formatDate(piece.publishDate)}</div>
@@ -103,12 +127,9 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
       await updateDoc(doc(db, 'clients', piece.clientId, 'pieces', piece.id), {
         ...form,
         publishDate: inputToTs(form.publishDate),
-        pillars: {
-          education:   parseInt(form.pillars.education)   || 0,
-          inspiration: parseInt(form.pillars.inspiration) || 0,
-          commercial:  parseInt(form.pillars.commercial)  || 0,
-          interaction: parseInt(form.pillars.interaction) || 0,
-        },
+        pillars: Object.fromEntries(
+          Object.entries(form.pillars).map(([k, v]) => [k, parseInt(v) || 0])
+        ),
       })
       showToast('Pieza actualizada.')
       onSaved()
@@ -189,11 +210,11 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
           <div className="mb-4">
             <label className="block text-k-muted text-sm mb-2">Pilares de contenido</label>
             <div className="grid grid-cols-2 gap-2">
-              {PILLAR_KEYS.map(({ key, label }) => (
+              {Object.entries(form.pillars).map(([key, val]) => (
                 <div key={key} className="flex items-center gap-2 bg-k-surface rounded-card px-3 py-2" style={{ border: '1px solid var(--color-border)' }}>
-                  <span className="text-k-muted text-xs flex-1 truncate">{label}</span>
+                  <span className="text-k-muted text-xs flex-1 truncate">{key}</span>
                   <input type="number" min="0" max="100"
-                    value={form.pillars[key]}
+                    value={val}
                     onChange={e => set('pillars', { ...form.pillars, [key]: e.target.value })}
                     className="w-14 bg-k-bg text-k-text text-xs text-center px-2 py-1 rounded outline-none focus:ring-1 focus:ring-k-orange/40"
                     style={INP_S}

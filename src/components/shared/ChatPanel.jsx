@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { FiSend } from 'react-icons/fi'
 
@@ -21,6 +21,12 @@ export default function ChatPanel({ clientId, pieceId, userRole, reviewRounds = 
     return unsub
   }, [clientId, pieceId])
 
+  // Admin resets unread counter on open; client panel doesn't need to
+  useEffect(() => {
+    if (userRole !== 'admin' || !clientId || !pieceId) return
+    updateDoc(doc(db, 'clients', clientId, 'pieces', pieceId), { unreadByAdmin: 0 }).catch(() => {})
+  }, [clientId, pieceId, userRole])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -34,6 +40,9 @@ export default function ChatPanel({ clientId, pieceId, userRole, reviewRounds = 
         collection(db, 'clients', clientId, 'pieces', pieceId, 'messages'),
         { text: input.trim(), role: userRole, createdAt: serverTimestamp() }
       )
+      if (userRole === 'client') {
+        updateDoc(doc(db, 'clients', clientId, 'pieces', pieceId), { unreadByAdmin: increment(1) }).catch(() => {})
+      }
       setInput('')
     } finally {
       setSending(false)

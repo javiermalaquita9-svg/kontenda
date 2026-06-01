@@ -6,12 +6,20 @@ import { useClients } from '../../hooks/useClients'
 import { useToast } from '../../context/ToastContext'
 import { inputToTs } from '../../utils/date'
 
-const PILLAR_KEYS = [
-  { key: 'education',   label: 'Educación y Valor' },
-  { key: 'inspiration', label: 'Inspiración y Detrás de Escena' },
-  { key: 'commercial',  label: 'Comercial y Promocional' },
-  { key: 'interaction', label: 'Interacción y Entretenimiento' },
+const DEFAULT_PILLAR_LABELS = [
+  'Educación y Valor',
+  'Inspiración y Detrás de Escena',
+  'Comercial y Promocional',
+  'Interacción y Entretenimiento',
 ]
+
+function equalPillars(pillars) {
+  const n = pillars.length
+  if (!n) return {}
+  const base = Math.floor(100 / n)
+  const rem = 100 - base * n
+  return Object.fromEntries(pillars.map((p, i) => [p, i === 0 ? base + rem : base]))
+}
 
 const BLANK = {
   title:       '',
@@ -25,7 +33,7 @@ const BLANK = {
   frameUrl:    '',
   hashtags:    '',
   copy:        '',
-  pillars:     { education: 25, inspiration: 25, commercial: 25, interaction: 25 },
+  pillars:     equalPillars(DEFAULT_PILLAR_LABELS),
 }
 
 const INP = 'w-full bg-k-surface2 text-k-text text-sm px-3.5 py-2.5 rounded-card outline-none focus:ring-2 focus:ring-k-orange/30 placeholder:text-k-muted/40'
@@ -60,8 +68,15 @@ export default function CreatePiece() {
     setForm(p => ({ ...p, pillars: { ...p.pillars, [key]: val } }))
   }
 
+  const activePillars = useMemo(() => {
+    if (selectedClient?.contentPillars?.length) return selectedClient.contentPillars
+    return DEFAULT_PILLAR_LABELS
+  }, [selectedClient])
+
   function handleClientChange(id) {
-    setForm(p => ({ ...p, clientId: id, objective: '', format: '', tag: '' }))
+    const client = clients.find(c => c.id === id)
+    const pillars = client?.contentPillars?.length ? client.contentPillars : DEFAULT_PILLAR_LABELS
+    setForm(p => ({ ...p, clientId: id, objective: '', format: '', tag: '', pillars: equalPillars(pillars) }))
   }
 
   const total = Object.values(form.pillars).reduce((s, v) => s + (parseInt(v) || 0), 0)
@@ -81,12 +96,9 @@ export default function CreatePiece() {
         clientName:  selectedClient?.name ?? '',
         publishDate: inputToTs(form.publishDate),
         objective:   form.objective,
-        pillars:     {
-          education:   parseInt(form.pillars.education)   || 0,
-          inspiration: parseInt(form.pillars.inspiration) || 0,
-          commercial:  parseInt(form.pillars.commercial)  || 0,
-          interaction: parseInt(form.pillars.interaction) || 0,
-        },
+        pillars: Object.fromEntries(
+          Object.entries(form.pillars).map(([k, v]) => [k, parseInt(v) || 0])
+        ),
         format:         form.format,
         tag:            form.tag,
         description:    form.description.trim(),
@@ -162,14 +174,14 @@ export default function CreatePiece() {
               </span>
             </div>
             <div className="bg-k-surface rounded-card p-4 flex flex-col gap-3" style={{ border: '1px solid var(--color-border)' }}>
-              {PILLAR_KEYS.map(({ key, label }) => (
-                <div key={key} className="flex items-center gap-3">
-                  <span className="text-k-muted text-sm flex-1 min-w-0 truncate">{label}</span>
+              {activePillars.map(pillar => (
+                <div key={pillar} className="flex items-center gap-3">
+                  <span className="text-k-muted text-sm flex-1 min-w-0 truncate">{pillar}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <input
                       type="number" min="0" max="100"
-                      value={form.pillars[key]}
-                      onChange={e => setPillar(key, e.target.value)}
+                      value={form.pillars[pillar] ?? 0}
+                      onChange={e => setPillar(pillar, e.target.value)}
                       className="w-16 bg-k-surface2 text-k-text text-sm text-center px-2 py-1.5 rounded-card outline-none focus:ring-2 focus:ring-k-orange/30"
                       style={INP_S}
                     />

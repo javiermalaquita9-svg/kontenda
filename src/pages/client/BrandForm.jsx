@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { FiCheck, FiUploadCloud, FiArrowLeft, FiArrowRight, FiSave, FiX } from 'react-icons/fi'
 import { db } from '../../firebase/config'
 import { useAuth } from '../../hooks/useAuth'
@@ -100,7 +100,7 @@ export default function BrandForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     // Small business form - 4 steps
-    s_dna_q1: '', s_dna_q2: [], s_dna_q3_cat: '', s_dna_q3_text: '', s_dna_q4: '', s_dna_q5: [],
+    s_dna_q1: '', s_dna_q2: [], s_dna_q3_cat: '', s_dna_q3_text: '', s_dna_q4: '', s_dna_q5: [], s_dna_q5_negative: [],
     s_dna_q6_pending: [], s_dna_q6_admired: [], s_dna_q6_competitors: [], s_dna_q6_admired_desc: '', s_dna_q6_comp_desc: '',
     s_dna_q7_today: '', s_dna_q7_m3: '', s_dna_q7_m6: '', s_dna_q7_m12: '', s_dna_q7_goalType: '', s_dna_q8_cat: '', s_dna_q8_text: '',
     s_visual_q9_assets: [], s_visual_q9_none: false, s_visual_q9_link: '',
@@ -123,7 +123,7 @@ export default function BrandForm() {
     s_ops_q28_source: '', s_ops_q28_details: '', s_ops_q29_ranked: [], s_ops_q30_has_legal: 'no', s_ops_q30_elements: [], s_ops_q30_link: '', 
     s_ops_q30_details: '', s_ops_q31_reviewer: '', s_ops_q31_time: '', s_ops_q31_details: '', s_ops_q32_ranked: [],
     // Large business form - 4 steps
-    l_dna_q1: '', l_dna_q2: [], l_dna_q3_cat: '', l_dna_q3_impact: '', l_dna_q3_text: '', l_dna_q4: '', l_dna_q5: [],
+    l_dna_q1: '', l_dna_q2: [], l_dna_q3_cat: '', l_dna_q3_impact: '', l_dna_q3_text: '', l_dna_q4: '', l_dna_q5: [], l_dna_q5_negative: [],
     l_dna_q6_pending: [], l_dna_q6_admired: [], l_dna_q6_comp_dir: [], l_dna_q6_comp_ind: [], l_dna_q6_admired_desc: '', l_dna_q6_comp_dir_desc: '', l_dna_q6_comp_ind_desc: '',
     l_dna_q7_today: {goal: '', kpi: '', type: ''}, l_dna_q7_m3: {goal: '', kpi: '', type: ''}, l_dna_q7_m6: {goal: '', kpi: '', type: ''}, l_dna_q7_m9: {goal: '', kpi: '', type: ''}, l_dna_q7_m12: {goal: '', kpi: '', type: ''}, 
     l_dna_q8_cat: '', l_dna_q8_text: '',
@@ -155,7 +155,40 @@ export default function BrandForm() {
 
   const [uploading, setUploading] = useState(false)
   const [success, setSuccess] = useState(false)
-  
+
+  const saveTimeoutRef = useRef(null)
+  const initialLoadDone = useRef(false)
+
+  // Load saved draft from Firestore
+  useEffect(() => {
+    if (!clientId) return
+    getDoc(doc(db, 'clients', clientId, 'brandForm', 'latest'))
+      .then(snap => {
+        if (snap.exists()) {
+          const { updatedAt, formType: ft, ...rest } = snap.data()
+          setFormData(prev => ({ ...prev, ...rest }))
+        }
+      })
+      .catch(() => {})
+      .finally(() => { initialLoadDone.current = true })
+  }, [clientId])
+
+  // Auto-save with 1.5s debounce
+  useEffect(() => {
+    if (!clientId || !initialLoadDone.current) return
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await setDoc(
+          doc(db, 'clients', clientId, 'brandForm', 'latest'),
+          { ...formData, formType, updatedAt: serverTimestamp() },
+          { merge: true }
+        )
+      } catch {}
+    }, 1500)
+    return () => clearTimeout(saveTimeoutRef.current)
+  }, [formData, clientId, formType])
+
   // Local UI states for Q2, Q5 & Q6 (Adding custom values)
   const [customValueQ2, setCustomValueQ2] = useState('')
   const [customValueQ5, setCustomValueQ5] = useState('')
@@ -242,58 +275,6 @@ export default function BrandForm() {
   }
 
   const handleNext = () => {
-    if (formType === 'small' && currentStep === 1) {
-      if (formData.s_dna_q3_cat === '📦 Otro' && !formData.s_dna_q3_text.trim()) {
-        showToast('Debes especificar el problema si seleccionaste "Otro".', 'warning'); return;
-      }
-      if (formData.s_dna_q6_admired.length < 1 || formData.s_dna_q6_competitors.length < 1) {
-        showToast('Debes agregar al menos 1 marca que admires y 1 competencia (Paso 6).', 'warning'); return;
-      }
-      if (!formData.s_dna_q7_m12.trim()) {
-        showToast('La meta a 12 meses es obligatoria (Paso 7).', 'warning'); return;
-      }
-    } else if (formType === 'small' && currentStep === 2) {
-      if (formData.s_visual_q13_references[0].url === '') {
-        showToast('Debes compartir al menos 1 URL de referencia (Pregunta 13).', 'warning'); return;
-      }
-      if (!formData.s_visual_q14_typo_choice) {
-        showToast('Debes elegir una opción sobre tus tipografías (Pregunta 14).', 'warning'); return;
-      }
-    } else if (formType === 'small' && currentStep === 3) {
-      if (formData.s_client_q18_ranked.length < 3) {
-        showToast('Debes ordenar las 3 frustraciones más relevantes de tu cliente (Pregunta 18).', 'warning'); return;
-      }
-      if (formData.s_client_q20_barrier === '✏️ Otra barrera' && !formData.s_client_q20_response.trim()) {
-        showToast('Debes especificar la barrera si seleccionaste "Otra barrera" (Pregunta 20).', 'warning'); return;
-      }
-    } else if (formType === 'large' && currentStep === 1) {
-      if (formData.l_dna_q6_admired.length < 1 || formData.l_dna_q6_comp_dir.length < 1 || formData.l_dna_q6_comp_ind.length < 1) {
-        showToast('Debes agregar al menos 1 marca en cada columna (Pregunta 6).', 'warning'); return;
-      }
-      if (!formData.l_dna_q7_m12.goal.trim()) {
-        showToast('El objetivo a 12 meses es obligatorio (Pregunta 7).', 'warning'); return;
-      }
-    } else if (formType === 'large' && currentStep === 2) {
-      if (formData.l_visual_q13_references[0].url === '') {
-        showToast('Debes compartir al menos 1 URL de referencia en el paso 13.', 'warning'); return;
-      }
-      if (!formData.l_visual_q14_typo_choice) {
-        showToast('Debes elegir una opción sobre tus tipografías corporativas (Pregunta 14).', 'warning'); return;
-      }
-    } else if (formType === 'large' && currentStep === 3) {
-      if (formData.l_client_q18_ranked.length < 3) {
-        showToast('Debes ordenar los 3 pain points principales de tu cliente (Pregunta 18).', 'warning'); return;
-      }
-      if (formData.l_client_q19_platforms.length < 1) {
-        showToast('Debes indicar al menos 1 plataforma de presencia de tu cliente (Pregunta 19).', 'warning'); return;
-      }
-      if (formData.l_client_q21_functional.length < 2 || formData.l_client_q21_strategic.length < 2 || formData.l_client_q21_emotional.length < 2) {
-        showToast('Debes clasificar al menos 2 tarjetas en cada columna de transformación (Pregunta 21).', 'warning'); return;
-      }
-      if (formData.l_client_q24_stages.length < 1) {
-        showToast('Debes indicar al menos 1 etapa del Customer Journey (Pregunta 24).', 'warning'); return;
-      }
-    }
     if (currentStep < 4) setCurrentStep(p => p + 1)
   }
 
@@ -372,9 +353,15 @@ export default function BrandForm() {
 
   // --- Handler limitador Q5 ---
   const handleQ5Change = (val) => {
-    if (formData.s_dna_q5.includes(val)) { setFormData(prev => ({ ...prev, s_dna_q5: prev.s_dna_q5.filter(v => v !== val) })) } 
+    if (formData.s_dna_q5.includes(val)) { setFormData(prev => ({ ...prev, s_dna_q5: prev.s_dna_q5.filter(v => v !== val) })) }
     else if (formData.s_dna_q5.length < 3) { setFormData(prev => ({ ...prev, s_dna_q5: [...prev.s_dna_q5, val] })) }
     else { showToast('¡Perfecto! Si quieres cambiar uno, desactívalo primero', 'warning') }
+  }
+
+  const handleQ5NegativeChange = (val) => {
+    if (formData.s_dna_q5_negative.includes(val)) { setFormData(prev => ({ ...prev, s_dna_q5_negative: prev.s_dna_q5_negative.filter(v => v !== val) })) }
+    else if (formData.s_dna_q5_negative.length < 2) { setFormData(prev => ({ ...prev, s_dna_q5_negative: [...prev.s_dna_q5_negative, val] })) }
+    else { showToast('Puedes descartar hasta 2 adjetivos. Desactiva uno para cambiarlo.', 'warning') }
   }
 
   // --- D&D Handlers para Pregunta 2 Corporativa ---
@@ -424,9 +411,15 @@ export default function BrandForm() {
   }
 
   const handleLQ5Change = (val) => {
-    if (formData.l_dna_q5.includes(val)) { setFormData(prev => ({ ...prev, l_dna_q5: prev.l_dna_q5.filter(v => v !== val) })) } 
+    if (formData.l_dna_q5.includes(val)) { setFormData(prev => ({ ...prev, l_dna_q5: prev.l_dna_q5.filter(v => v !== val) })) }
     else if (formData.l_dna_q5.length < 3) { setFormData(prev => ({ ...prev, l_dna_q5: [...prev.l_dna_q5, val] })) }
     else { showToast('Ya tienen sus 3 atributos de tono. Deseleccionen uno para cambiarlo.', 'warning') }
+  }
+
+  const handleLQ5NegativeChange = (val) => {
+    if (formData.l_dna_q5_negative.includes(val)) { setFormData(prev => ({ ...prev, l_dna_q5_negative: prev.l_dna_q5_negative.filter(v => v !== val) })) }
+    else if (formData.l_dna_q5_negative.length < 2) { setFormData(prev => ({ ...prev, l_dna_q5_negative: [...prev.l_dna_q5_negative, val] })) }
+    else { showToast('Pueden descartar hasta 2 adjetivos. Deseleccionen uno para cambiarlo.', 'warning') }
   }
 
   const handleQ7CorpChange = (node, field, value) => {
@@ -581,16 +574,26 @@ export default function BrandForm() {
       return
     }
 
+    // Full validation on submit
+    const missing = []
     if (formType === 'small') {
-      if (!formData.s_ops_q25_platforms.length || !formData.s_ops_q26_formats.length) {
-        showToast('Por favor, indica las plataformas y formatos que necesitas (Preguntas 25 y 26).', 'warning');
-        return
-      }
-    } else if (formType === 'large') {
-      if (!formData.l_ops_q25_platforms.length || !formData.l_ops_q26_formats.length) {
-        showToast('Por favor, indica las plataformas y formatos que requieren.', 'warning');
-        return
-      }
+      if (!formData.s_dna_q1?.trim()) missing.push('Pregunta 1 (ADN)')
+      if (!formData.s_dna_q2?.trim()) missing.push('Pregunta 2 (Propósito)')
+      if (!formData.s_dna_q3?.trim()) missing.push('Pregunta 3 (Valores)')
+      if (!formData.s_dna_q5?.length) missing.push('Pregunta 5 (Tono positivo)')
+      if (!formData.s_ops_q25_platforms?.length) missing.push('Pregunta 25 (Plataformas)')
+      if (!formData.s_ops_q26_formats?.length) missing.push('Pregunta 26 (Formatos)')
+    } else {
+      if (!formData.l_dna_q1?.trim()) missing.push('Pregunta 1 (ADN)')
+      if (!formData.l_dna_q2?.trim()) missing.push('Pregunta 2 (Propósito)')
+      if (!formData.l_dna_q3?.trim()) missing.push('Pregunta 3 (Valores)')
+      if (!formData.l_dna_q5?.length) missing.push('Pregunta 5 (Tono positivo)')
+      if (!formData.l_ops_q25_platforms?.length) missing.push('Pregunta 25 (Plataformas)')
+      if (!formData.l_ops_q26_formats?.length) missing.push('Pregunta 26 (Formatos)')
+    }
+    if (missing.length) {
+      showToast(`Faltan respuestas obligatorias: ${missing.join(', ')}.`, 'warning')
+      return
     }
 
     setUploading(true)
@@ -650,10 +653,10 @@ export default function BrandForm() {
       </button>
 
       <div className="flex items-center gap-2 mb-8">
-        <div className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 1 ? 'bg-k-orange' : 'bg-k-surface2'}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 2 ? 'bg-k-orange' : 'bg-k-surface2'}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 3 ? 'bg-k-orange' : 'bg-k-surface2'}`} />
-        <div className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 4 ? 'bg-k-orange' : 'bg-k-surface2'}`} />
+        <button type="button" onClick={() => setCurrentStep(1)} className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 1 ? 'bg-k-orange' : 'bg-k-surface2 hover:bg-k-surface2/70'}`} />
+        <button type="button" onClick={() => setCurrentStep(2)} className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 2 ? 'bg-k-orange' : 'bg-k-surface2 hover:bg-k-surface2/70'}`} />
+        <button type="button" onClick={() => setCurrentStep(3)} className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 3 ? 'bg-k-orange' : 'bg-k-surface2 hover:bg-k-surface2/70'}`} />
+        <button type="button" onClick={() => setCurrentStep(4)} className={`h-1.5 flex-1 rounded-full transition-colors ${currentStep >= 4 ? 'bg-k-orange' : 'bg-k-surface2 hover:bg-k-surface2/70'}`} />
       </div>
 
       <div className="mb-6">
@@ -746,12 +749,12 @@ export default function BrandForm() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-k-muted text-xs font-semibold mb-2">Descartar (No quiero sonar así)</p>
+                  <p className="text-k-muted text-xs font-semibold mb-2">Descartar (No quiero sonar así) — elige hasta 2</p>
                   <div className="flex flex-wrap gap-2">
                     {TONE_NEGATIVE.map(adj => {
-                      const active = formData.s_dna_q5.includes(adj);
-                      const disabled = !active && formData.s_dna_q5.length >= 3;
-                      return <button key={adj} type="button" disabled={disabled} onClick={() => handleQ5Change(adj)} className={`px-3 py-1.5 rounded-full text-xs transition-all border ${active ? 'bg-red-500/10 border-red-500 text-red-500 font-medium' : disabled ? 'bg-k-surface2 opacity-40 border-transparent text-k-muted cursor-not-allowed' : 'bg-k-surface2 border-transparent text-k-text hover:brightness-110'}`}>{adj}</button>
+                      const active = formData.s_dna_q5_negative.includes(adj);
+                      const disabled = !active && formData.s_dna_q5_negative.length >= 2;
+                      return <button key={adj} type="button" disabled={disabled} onClick={() => handleQ5NegativeChange(adj)} className={`px-3 py-1.5 rounded-full text-xs transition-all border ${active ? 'bg-red-500/10 border-red-500 text-red-500 font-medium' : disabled ? 'bg-k-surface2 opacity-40 border-transparent text-k-muted cursor-not-allowed' : 'bg-k-surface2 border-transparent text-k-text hover:brightness-110'}`}>{adj}</button>
                     })}
                   </div>
                 </div>
@@ -931,12 +934,12 @@ export default function BrandForm() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-k-muted text-xs font-semibold mb-2">Tono que quieren evitar</p>
+                  <p className="text-k-muted text-xs font-semibold mb-2">Tono que quieren evitar — elijan hasta 2</p>
                   <div className="flex flex-wrap gap-2">
                     {CORP_TONE_NEGATIVE.map(adj => {
-                      const active = formData.l_dna_q5.includes(adj);
-                      const disabled = !active && formData.l_dna_q5.length >= 3;
-                      return <button key={adj} type="button" disabled={disabled} onClick={() => handleLQ5Change(adj)} className={`px-3 py-1.5 rounded-full text-xs transition-all border ${active ? 'bg-red-500/10 border-red-500 text-red-500 font-medium' : disabled ? 'bg-k-surface2 opacity-40 border-transparent text-k-muted cursor-not-allowed' : 'bg-k-surface2 border-transparent text-k-text hover:brightness-110'}`}>{adj}</button>
+                      const active = formData.l_dna_q5_negative.includes(adj);
+                      const disabled = !active && formData.l_dna_q5_negative.length >= 2;
+                      return <button key={adj} type="button" disabled={disabled} onClick={() => handleLQ5NegativeChange(adj)} className={`px-3 py-1.5 rounded-full text-xs transition-all border ${active ? 'bg-red-500/10 border-red-500 text-red-500 font-medium' : disabled ? 'bg-k-surface2 opacity-40 border-transparent text-k-muted cursor-not-allowed' : 'bg-k-surface2 border-transparent text-k-text hover:brightness-110'}`}>{adj}</button>
                     })}
                   </div>
                 </div>
@@ -1020,34 +1023,6 @@ export default function BrandForm() {
         {currentStep === 2 && formType === 'small' && ( // ── PASO 2: VISUAL ───────────────────────────
           <div className="flex flex-col gap-6">
             
-            {/* Q9 */}
-            <Field label="9. ¿Tienes logo, manual de marca o paleta de colores definida?" description="Selecciona todo lo que tengas actualmente.">
-              <div className="flex flex-col gap-2">
-                {ASSETS_CHECKLIST.map(opt => (
-                  <label key={opt} className={`flex items-center gap-2 text-sm cursor-pointer ${formData.s_visual_q9_none ? 'opacity-50' : ''}`}>
-                    <input type="checkbox" checked={formData.s_visual_q9_assets.includes(opt)} disabled={formData.s_visual_q9_none} onChange={() => handleCheckboxChange('s_visual_q9_assets', opt)} className="w-4 h-4 accent-k-orange" /> {opt}
-                  </label>
-                ))}
-                <label className="flex items-center gap-2 text-sm cursor-pointer mt-1">
-                  <input type="checkbox" checked={formData.s_visual_q9_none} onChange={() => setFormData(p => ({ ...p, s_visual_q9_none: !p.s_visual_q9_none, s_visual_q9_assets: !p.s_visual_q9_none ? [] : p.s_visual_q9_assets }))} className="w-4 h-4 accent-k-orange" />
-                  No tengo nada definido aún
-                </label>
-                
-                {formData.s_visual_q9_assets.length > 0 && !formData.s_visual_q9_none && (
-                  <div className="mt-3 p-4 bg-k-surface2 rounded-card border border-k-border">
-                    <p className="text-k-text text-sm font-medium mb-1">Carga de archivos</p>
-                    <p className="text-k-muted text-xs mb-3">Formatos aceptados: PDF, AI, PNG, SVG, ZIP (máx. 20MB)</p>
-                    <div className="flex items-center gap-3">
-                      <input type="file" accept=".pdf,.ai,.png,.svg,.zip" multiple className="text-xs text-k-muted file:mr-4 file:py-2 file:px-4 file:rounded-card file:border-0 file:text-xs file:font-semibold file:bg-k-orange/10 file:text-k-orange hover:file:bg-k-orange/20 cursor-pointer" />
-                    </div>
-                    <p className="text-k-muted text-[10px] mt-2 italic">O pega el enlace a tu carpeta de Drive si son muy pesados:</p>
-                    <input type="text" name="s_visual_q9_link" value={formData.s_visual_q9_link} onChange={handleTextChange} placeholder="https://drive.google.com/..." className={`${inputClass} mt-1 py-2 text-xs`} />
-                  </div>
-                )}
-                {formData.s_visual_q9_none && <p className="text-green-400 text-xs italic mt-2">Perfecto, partimos desde cero juntos.</p>}
-              </div>
-            </Field>
-
             {/* Q10 */}
             <Field label="10. ¿Hay colores que sí o sí deben estar en tu marca? ¿Y alguno que no va contigo?">
               <div className="mb-4">
@@ -1162,36 +1137,6 @@ export default function BrandForm() {
         {currentStep === 2 && formType === 'large' && ( // ── PASO 2: LINEAMIENTOS (LARGE) ──────────
           <div className="flex flex-col gap-6">
             
-            {/* Q9 Corporate Assets */}
-            <Field label="9. ¿Cuentan con manual de marca, logotipo oficial y paleta de colores definida?" description="Selecciona el estado de tus activos.">
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer mb-2 border-b border-k-border pb-2"><input type="checkbox" checked={formData.l_visual_q9_none} onChange={() => setFormData(p => ({...p, l_visual_q9_none: !p.l_visual_q9_none, l_visual_q9_assets: !p.l_visual_q9_none ? {} : p.l_visual_q9_assets}))} className="w-4 h-4 accent-k-orange" /> ❌ No contamos con esto aún</label>
-                
-                <div className={`flex flex-col gap-3 ${formData.l_visual_q9_none ? 'opacity-40 pointer-events-none' : ''}`}>
-                  {CORP_ASSETS.map(a => (
-                    <div key={a} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-k-surface2/50 rounded-card border border-k-border">
-                      <span className="text-sm text-k-text">{a}</span>
-                      <select value={formData.l_visual_q9_assets[a] || 'none'} onChange={e => handleCorpAssetChange(a, e.target.value)} className="bg-k-surface text-xs text-k-text px-2 py-1.5 rounded outline-none border border-k-border cursor-pointer min-w-[140px]">
-                        <option value="none">No disponible</option>
-                        <option value="available">✅ Disponible y actualizado</option>
-                        <option value="outdated">🔄 Existe pero desactualizado</option>
-                      </select>
-                    </div>
-                  ))}
-                  
-                  {Object.values(formData.l_visual_q9_assets).some(v => v === 'available' || v === 'outdated') && (
-                    <div className="mt-2 p-4 bg-k-surface2 rounded-card border border-k-border">
-                      <p className="text-k-text text-sm font-medium mb-1">Carga de archivos</p>
-                      <p className="text-k-muted text-xs mb-3">Formatos aceptados: PDF, AI, EPS, PNG, SVG, ZIP, OTF, TTF (máx. 50MB)</p>
-                      <input type="file" accept=".pdf,.ai,.eps,.png,.svg,.zip,.otf,.ttf" multiple className="text-xs text-k-muted file:mr-4 file:py-2 file:px-4 file:rounded-card file:border-0 file:font-semibold file:bg-k-orange/10 file:text-k-orange cursor-pointer mb-3" />
-                      <p className="text-k-muted text-xs italic mb-1">Enlace a carpeta compartida (opcional si es muy pesado):</p>
-                      <input type="url" name="l_visual_q9_link" value={formData.l_visual_q9_link} onChange={handleTextChange} placeholder="https://drive.google.com/..." className={inputClass} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Field>
-
             {/* Q10 Corporate Colors */}
             <Field label="10. ¿Existen colores corporativos de uso obligatorio o colores que por política deben evitarse?">
               <label className="flex items-center gap-2 text-sm cursor-pointer mb-4"><input type="checkbox" checked={formData.l_visual_q10_no_restrictions} onChange={() => setFormData(p => ({...p, l_visual_q10_no_restrictions: !p.l_visual_q10_no_restrictions}))} className="w-4 h-4 accent-k-orange" /> No tenemos restricciones de color definidas</label>
@@ -1679,23 +1624,6 @@ export default function BrandForm() {
               )}
             </Field>
 
-            {/* Q29 */}
-            <Field label="29. ¿Cuáles son las 3 frases con las que más le pides a tu audiencia que haga algo?" description="Arrastra tus 3 CTAs principales.">
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="bg-k-surface2/50 rounded-card p-3 border border-dashed border-k-border min-h-[150px]" onDragOver={handleDragOverRank} onDrop={e => handleDropRank(e, 's_ops_q29_ranked', 'remove', null)}>
-                    <p className="text-k-muted text-xs font-semibold mb-2">CTAs disponibles</p>
-                    <div className="flex flex-col gap-2">
-                       {CTAS_Q29.filter(c => !formData.s_ops_q29_ranked.includes(c)).map(c => <div key={c} draggable onDragStart={e => handleDragStartRank(e, c)} className="bg-k-surface border border-k-border text-k-text text-[10px] px-2 py-1.5 rounded cursor-grab">{c}</div>)}
-                       <input type="text" value={customCtaQ29} onChange={e => setCustomCtaQ29(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); if(customCtaQ29.trim() && formData.s_ops_q29_ranked.length < 3) { setFormData(p => ({...p, s_ops_q29_ranked: [...p.s_ops_q29_ranked, customCtaQ29.trim()]})); setCustomCtaQ29('') } } }} placeholder="+ Agregar mi propio CTA" className="bg-k-surface text-k-text text-xs px-2 py-1.5 rounded border border-k-border outline-none mt-2" />
-                    </div>
-                 </div>
-                 <div className="bg-k-orange/5 rounded-card p-3 border border-dashed border-k-orange/50 min-h-[150px] flex flex-col gap-2" onDragOver={handleDragOverRank} onDrop={e => handleDropRank(e, 's_ops_q29_ranked', 'add', 3)}>
-                    <p className="text-k-orange text-xs font-semibold mb-1">Top 3 CTAs</p>
-                    {formData.s_ops_q29_ranked.map((c, i) => <div key={c} draggable onDragStart={e => handleDragStartRank(e, c)} className="bg-k-surface border border-k-orange text-k-text text-[10px] px-2 py-1.5 rounded flex items-center justify-between cursor-grab"><span><span className="text-k-orange font-bold mr-2">{i+1}°</span> {c}</span><button type="button" onClick={() => setFormData(p => ({...p, s_ops_q29_ranked: p.s_ops_q29_ranked.filter(item => item !== c)}))} className="text-k-muted hover:text-red-400">×</button></div>)}
-                 </div>
-              </div>
-            </Field>
-
             {/* Q30 */}
             <Field label="30. ¿Hay algún logo de partner, marca de agua o texto legal que deba aparecer siempre?">
               <div className="flex flex-col gap-3">
@@ -1855,24 +1783,6 @@ export default function BrandForm() {
                   </div>
                 )}
               </div>
-            </Field>
-
-            {/* Q29 */}
-            <Field label="29. ¿Cuáles son los 3 llamados a la acción que utilizan con mayor frecuencia en su comunicación?" description="Arrastra al Top 3 los institucionales.">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="bg-k-surface2/50 rounded-card p-3 border border-dashed border-k-border min-h-[150px]" onDragOver={handleDragOverRank} onDrop={e => handleDropRank(e, 'l_ops_q29_ranked', 'remove', null)}>
-                    <p className="text-k-muted text-xs font-semibold mb-2">CTAs disponibles</p>
-                    <div className="flex flex-col gap-2">
-                       {CORP_Q29_CTAS.filter(c => !formData.l_ops_q29_ranked.includes(c)).map(c => <div key={c} draggable onDragStart={e => handleDragStartRank(e, c)} className="bg-k-surface border border-k-border text-k-text text-[10px] px-2 py-1.5 rounded cursor-grab">{c}</div>)}
-                       <input type="text" value={customCtaLQ29} onChange={e => setCustomCtaLQ29(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); if(customCtaLQ29.trim() && formData.l_ops_q29_ranked.length < 3) { setFormData(p => ({...p, l_ops_q29_ranked: [...p.l_ops_q29_ranked, customCtaLQ29.trim()]})); setCustomCtaLQ29('') } } }} placeholder="+ Agregar CTA institucional propio" className="bg-k-surface text-k-text text-xs px-2 py-1.5 rounded border border-k-border outline-none mt-2" />
-                    </div>
-                 </div>
-                 <div className="bg-k-orange/5 rounded-card p-3 border border-dashed border-k-orange/50 min-h-[150px] flex flex-col gap-2" onDragOver={handleDragOverRank} onDrop={e => handleDropRank(e, 'l_ops_q29_ranked', 'add', 3)}>
-                    <p className="text-k-orange text-xs font-semibold mb-1">Top 3 CTAs</p>
-                    {formData.l_ops_q29_ranked.map((c, i) => <div key={c} draggable onDragStart={e => handleDragStartRank(e, c)} className="bg-k-surface border border-k-orange text-k-text text-[10px] px-2 py-1.5 rounded flex items-center justify-between cursor-grab"><span><span className="text-k-orange font-bold mr-2">{i+1}°</span> {c}</span><button type="button" onClick={() => setFormData(p => ({...p, l_ops_q29_ranked: p.l_ops_q29_ranked.filter(item => item !== c)}))} className="text-k-muted hover:text-red-400">×</button></div>)}
-                 </div>
-              </div>
-              <input type="text" name="l_ops_q29_mandatory" value={formData.l_ops_q29_mandatory} onChange={handleTextChange} maxLength={100} className={`${inputClass} text-xs mt-3`} placeholder="¿Hay algún CTA que deban usar obligatoriamente por política de marca o legal?" />
             </Field>
 
             {/* Q30 */}

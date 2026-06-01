@@ -28,7 +28,7 @@ const DEFAULT_OBJECTIVES = ['Posicionamiento', 'Autoridad y Confianza', 'Convers
 const DEFAULT_FORMATS   = ['Reels/TikTok', 'Post', 'Carrusel', 'Story', 'Meta Ads']
 
 const BLANK_FORM = {
-  name: '', email: '', phone: '', rut: '', address: '', description: '', logoUrl: '', // NEW: Added phone field
+  name: '', email: '', phone: '', region: '', comuna: '', description: '', logoUrl: '',
   password: '', // NEW: Add password field
   quickLinks: [],
   contentPillars: [...DEFAULT_PILLARS],
@@ -127,8 +127,8 @@ export default function ClientManager() {
       name:           client.name           ?? '',
       phone:          client.phone          ?? '',
       email:          client.email          ?? '',
-      rut:            client.rut            ?? '',
-      address:        client.address        ?? '',
+      region:         client.region         ?? '',
+      comuna:         client.comuna         ?? '',
       description:    client.description    ?? '',
       password:       client.loginPassword  ?? '',
       logoUrl:        client.logoUrl        ?? '',
@@ -276,7 +276,7 @@ export default function ClientManager() {
       <div className="p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-k-text text-2xl font-semibold">Registro de Clientes</h1> {/* MODIFIED: Title change */}
+            <h1 className="text-k-text text-2xl font-semibold">Registro de Clientes</h1>
             <p className="text-k-muted text-sm mt-0.5">{clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}</p>
           </div>
           <button onClick={openNew} className="flex items-center gap-2 bg-k-orange hover:bg-k-orange/90 text-white text-sm font-medium px-4 py-2.5 rounded-card transition-colors">
@@ -371,11 +371,11 @@ export default function ClientManager() {
             <Field label="Teléfono">
               <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+56912345678" autoComplete="off" name="cliente-telefono" className={INP} style={INP_STYLE} />
             </Field>
-            <Field label="RUT">
-              <input value={form.rut} onChange={e => set('rut', e.target.value)} placeholder="12.345.678-9" autoComplete="off" name="cliente-rut" className={INP} style={INP_STYLE} />
+            <Field label="Región">
+              <input value={form.region} onChange={e => set('region', e.target.value)} placeholder="Ej: Región Metropolitana" autoComplete="off" name="cliente-region" className={INP} style={INP_STYLE} />
             </Field>
-            <Field label="Dirección">
-              <input value={form.address} onChange={e => set('address', e.target.value)} placeholder="Av. Principal 123" autoComplete="off" name="cliente-direccion" className={INP} style={INP_STYLE} />
+            <Field label="Comuna">
+              <input value={form.comuna} onChange={e => set('comuna', e.target.value)} placeholder="Ej: Las Condes" autoComplete="off" name="cliente-comuna" className={INP} style={INP_STYLE} />
             </Field>
             <Field label={editingId ? 'Contraseña de acceso' : 'Contraseña del cliente *'}>
               <div className="relative">
