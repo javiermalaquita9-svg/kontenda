@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import {
   FiGrid, FiList, FiExternalLink, FiEdit2, FiTrash2, FiX,
-  FiArrowLeft, FiFolder, FiVideo, FiMessageCircle,
+  FiArrowLeft, FiFolder, FiVideo, FiMessageCircle, FiCopy, FiCheck,
 } from 'react-icons/fi'
 import { db } from '../../firebase/config'
 import { useClients } from '../../hooks/useClients'
@@ -98,6 +98,68 @@ function PieceCard({ piece, clients, onView, onDelete }) {
   )
 }
 
+// ── Copy field with copy + edit toggle ──────────────────────────
+function CopyField({ label, value, onChange, rows = 2 }) {
+  const { showToast } = useToast()
+  const [editing, setEditing] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    if (!value) return
+    navigator.clipboard.writeText(value).then(() => {
+      showToast('Copiado al portapapeles')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => showToast('No se pudo copiar', 'error'))
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-k-muted text-sm">{label}</label>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={handleCopy}
+            title="Copiar"
+            className="flex items-center gap-1 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-2 py-1 rounded-card transition-colors"
+            style={{ border: '1px solid var(--color-border)' }}
+          >
+            {copied ? <FiCheck size={12} className="text-green-400" /> : <FiCopy size={12} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(v => !v)}
+            title={editing ? 'Ver' : 'Editar'}
+            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-card transition-colors ${
+              editing ? 'bg-k-orange/20 text-k-orange' : 'text-k-muted hover:text-k-text bg-k-surface2'
+            }`}
+            style={{ border: '1px solid var(--color-border)' }}
+          >
+            <FiEdit2 size={12} />
+          </button>
+        </div>
+      </div>
+      {editing ? (
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          rows={rows}
+          className={`${INP} resize-none`}
+          style={INP_S}
+        />
+      ) : (
+        <div
+          className="w-full bg-k-bg text-k-text text-sm px-3.5 py-2.5 rounded-card whitespace-pre-wrap break-words"
+          style={{ border: '1px solid var(--color-border)', minHeight: `${rows * 1.75 + 1.25}rem` }}
+        >
+          {value || <span className="text-k-muted/40 italic text-xs">Sin contenido</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Review panel ────────────────────────────────────────────────
 function ReviewPanel({ piece, clients, onClose, onSaved }) {
   const { showToast } = useToast()
@@ -117,7 +179,8 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
     status:      piece.status ?? 'en_revision',
     pillars:     piece.pillars ?? { education: 25, inspiration: 25, commercial: 25, interaction: 25 },
   })
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]   = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   function set(key, val) { setForm(p => ({ ...p, [key]: val })) }
 
@@ -152,20 +215,27 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
           <StatusBadge status={form.status} />
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setChatOpen(true)}
+            className="md:hidden flex items-center gap-1.5 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-3 py-2 rounded-card transition-colors"
+            style={{ border: '1px solid var(--color-border)' }}
+          >
+            <FiMessageCircle size={13} /> Chat
+          </button>
           {piece.driveUrl && (
-            <a href={piece.driveUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-3 py-2 rounded-card transition-colors" style={{ border: '1px solid var(--color-border)' }}>
+            <a href={piece.driveUrl} target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-1.5 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-3 py-2 rounded-card transition-colors" style={{ border: '1px solid var(--color-border)' }}>
               <FiFolder size={13} /> Drive
             </a>
           )}
           {piece.frameUrl && (
-            <a href={piece.frameUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-3 py-2 rounded-card transition-colors" style={{ border: '1px solid var(--color-border)' }}>
+            <a href={piece.frameUrl} target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-1.5 text-xs text-k-muted hover:text-k-text bg-k-surface2 px-3 py-2 rounded-card transition-colors" style={{ border: '1px solid var(--color-border)' }}>
               <FiVideo size={13} /> Frame.io
             </a>
           )}
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* ── Left: editable form ── */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -242,12 +312,20 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
             <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className={`${INP} resize-none`} style={INP_S} />
           </div>
           <div className="mb-4">
-            <label className="block text-k-muted text-sm mb-1.5">Hashtags</label>
-            <textarea value={form.hashtags} onChange={e => set('hashtags', e.target.value)} rows={2} className={`${INP} resize-none`} style={INP_S} />
+            <CopyField
+              label="Hashtags"
+              value={form.hashtags}
+              onChange={val => set('hashtags', val)}
+              rows={2}
+            />
           </div>
           <div className="mb-6">
-            <label className="block text-k-muted text-sm mb-1.5">Copy de publicación</label>
-            <textarea value={form.copy} onChange={e => set('copy', e.target.value)} rows={4} className={`${INP} resize-none`} style={INP_S} />
+            <CopyField
+              label="Copy de publicación"
+              value={form.copy}
+              onChange={val => set('copy', val)}
+              rows={4}
+            />
           </div>
 
           <button onClick={handleSave} disabled={saving} className="px-5 py-2.5 rounded-card text-sm font-medium bg-k-orange hover:bg-k-orange/90 text-white transition-colors disabled:opacity-50">
@@ -255,8 +333,28 @@ function ReviewPanel({ piece, clients, onClose, onSaved }) {
           </button>
         </div>
 
-        {/* ── Right: chat ── */}
-        <div className="w-80 shrink-0 flex flex-col" style={{ borderLeft: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+        {/* ── Right: chat — drawer on mobile, column on desktop ── */}
+        {chatOpen && (
+          <div
+            className="absolute inset-0 bg-black/40 z-10 md:hidden"
+            onClick={() => setChatOpen(false)}
+          />
+        )}
+        <div
+          className={`
+            absolute inset-y-0 right-0 z-20 w-full sm:w-80 flex flex-col
+            transition-transform duration-300 ease-in-out
+            ${chatOpen ? 'translate-x-0' : 'translate-x-full'}
+            md:relative md:translate-x-0 md:inset-auto md:w-80 md:shrink-0 md:z-auto
+          `}
+          style={{ borderLeft: '1px solid var(--color-border)', background: 'var(--color-surface)' }}
+        >
+          <div className="flex items-center gap-2 px-4 h-12 shrink-0 md:hidden" style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <button onClick={() => setChatOpen(false)} className="text-k-muted hover:text-k-text transition-colors">
+              <FiArrowLeft size={18} />
+            </button>
+            <span className="text-k-text text-sm font-medium">Chat</span>
+          </div>
           <ChatPanel
             clientId={piece.clientId}
             pieceId={piece.id}
@@ -398,7 +496,7 @@ export default function ContentManager() {
             <p className="text-k-muted text-sm">No hay piezas activas con estos filtros.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filtered.map(p => (
               <PieceCard key={p.id} piece={p} clients={clients} onView={setSelectedPiece} onDelete={handleDelete} />
             ))}

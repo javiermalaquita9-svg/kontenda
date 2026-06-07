@@ -8,7 +8,7 @@ const STATUS_MAP = {
 export default function StatusBadge({ status }) {
   const cfg = STATUS_MAP[status] ?? { label: status, cls: 'bg-k-surface2 text-k-muted' }
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg.cls}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${cfg.cls}`}>
       {cfg.label}
     </span>
   )
